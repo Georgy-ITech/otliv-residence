@@ -1,10 +1,8 @@
 import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
 import { createHashRouter, Outlet, RouterProvider, useLocation } from "react-router-dom";
-import "@fontsource/alegreya/cyrillic-500-italic.css";
-import "@fontsource/alegreya/cyrillic-600-italic.css";
-import "@fontsource/alegreya/latin-500-italic.css";
-import "@fontsource/alegreya/latin-600-italic.css";
+import "@fontsource/prata/cyrillic-400.css";
+import "@fontsource/prata/latin-400.css";
 import "@fontsource/golos-text/cyrillic-400.css";
 import "@fontsource/golos-text/cyrillic-500.css";
 import "@fontsource/golos-text/cyrillic-600.css";

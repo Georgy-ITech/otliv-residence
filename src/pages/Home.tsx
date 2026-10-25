@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
 import Hero from "../components/Hero";
-import { District, House, Journal, Mortgage, Types } from "../components/Sections";
+import { Choose, City, Interiors, Manifest } from "../components/Cinema";
+import { Journal, Mortgage, Types } from "../components/Sections";
 import ViewingForm from "../components/ViewingForm";
 
 export default function Home() {
@@ -16,16 +17,18 @@ export default function Home() {
   }, [to]);
 
   useEffect(() => {
-    document.title = "Отлив — квартиры у Уссурийского залива, Владивосток";
+    document.title = "Отлив — резиденции у Уссурийского залива, Владивосток";
   }, []);
 
   return (
     <>
       <Hero />
-      <House />
+      <Manifest />
+      <Interiors />
       <Types />
+      <Choose />
+      <City />
       <Mortgage />
-      <District />
       <Journal />
       <ViewingForm />
     </>

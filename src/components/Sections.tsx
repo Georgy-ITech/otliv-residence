@@ -1,39 +1,8 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { APARTMENTS, FLOORS } from "../data/apartments";
-import { FACTS } from "../data/site";
-import { SITE as BAY_SITE } from "../chart/bay";
 import { annuity, flats, mln, rub } from "../lib/format";
-import ChartCanvas from "./ChartCanvas";
 import { Arrow } from "./Icons";
-
-/* ---------- Дом: условные обозначения вместо плиток с цифрами ---------- */
-export function House() {
-  return (
-    <section className="sec house" aria-labelledby="house-title">
-      <div className="house__text">
-        <h2 id="house-title" className="h2">Башня на мысу, окнами в залив</h2>
-        <p>
-          Двадцать шесть этажей на каменистом мысу полуострова Басаргина. Южный фасад смотрит на Уссурийский залив,
-          северный — на сопки. Квартиры с окнами на две стороны занимают углы, на последнем этаже — два пентхауса
-          с террасами.
-        </p>
-        <p>
-          Внизу — лобби с двойной высотой и терраса к воде, под домом — паркинг на 160 мест. До галечного пляжа
-          три минуты по собственной лестнице с мыса.
-        </p>
-      </div>
-      <dl className="legend-table">
-        {FACTS.map((f) => (
-          <div key={f.k}>
-            <dt>{f.k}</dt>
-            <dd className="num">{f.v}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
-  );
-}
 
 /* ---------- Квартиры по типам: таблица цен «от» ---------- */
 export function Types() {
@@ -165,83 +134,6 @@ function Slider({ label, value, min, max, step, onChange, format }: { label: str
       </span>
       <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ "--p": `${pct}%` } as React.CSSProperties} />
     </label>
-  );
-}
-
-/* ---------- Район: курсы от дома, как прокладка на карте ---------- */
-const PLACES = [
-  { name: "Галечный пляж", min: 3, how: "пешком", x: 1117, y: 516 },
-  { name: "Остановка автобуса", min: 4, how: "пешком", x: 900, y: 330 },
-  { name: "Детский сад", min: 6, how: "пешком", x: 700, y: 250 },
-  { name: "Набережная и сквер", min: 7, how: "пешком", x: 1373, y: 204 },
-  { name: "Школа", min: 9, how: "пешком", x: 560, y: 160 },
-  { name: "Центр города", min: 25, how: "на машине", x: 430, y: 40 },
-];
-
-export function District() {
-  const [hot, setHot] = useState<number | null>(null);
-  const view = useMemo(() => ({ x: 380, y: 0, w: 1100, h: 720 }), []);
-  const overlay = useCallback(
-    (ctx: CanvasRenderingContext2D) => {
-      PLACES.forEach((p, i) => {
-        const on = hot === null || hot === i;
-        ctx.save();
-        ctx.globalAlpha = on ? 1 : 0.25;
-        ctx.strokeStyle = "#a1267f";
-        ctx.fillStyle = "#a1267f";
-        ctx.lineWidth = hot === i ? 3 : 2;
-        ctx.setLineDash([10, 6]);
-        ctx.beginPath();
-        ctx.moveTo(BAY_SITE.x, BAY_SITE.y);
-        ctx.lineTo(p.x, p.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, 7, 0, Math.PI * 2);
-        ctx.fill();
-        const mx = (BAY_SITE.x + p.x) / 2, my = (BAY_SITE.y + p.y) / 2;
-        ctx.font = "italic 600 22px Alegreya, serif";
-        ctx.textAlign = "center";
-        ctx.fillStyle = "#fbfbf8";
-        ctx.fillRect(mx - 34, my - 15, 68, 28);
-        ctx.fillStyle = "#a1267f";
-        ctx.fillText(`${p.min} мин`, mx, my + 7);
-        ctx.restore();
-      });
-      // Дом — знак ориентира: кружок с точкой, как маяк на карте.
-      ctx.save();
-      ctx.fillStyle = "#16191c";
-      ctx.beginPath();
-      ctx.arc(BAY_SITE.x, BAY_SITE.y, 13, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = "#fbfbf8";
-      ctx.beginPath();
-      ctx.arc(BAY_SITE.x, BAY_SITE.y, 5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-    },
-    [hot],
-  );
-  return (
-    <section id="rayon" className="sec district" aria-labelledby="district-title">
-      <div className="district__map">
-        <ChartCanvas view={view} overlay={overlay} opts={{ soundings: true }} label="Карта района: дом на мысу и маршруты до пляжа, школы, детского сада, набережной и остановки" />
-      </div>
-      <div className="district__text">
-        <h2 id="district-title" className="h2">Всё нужное — в пределах прогулки</h2>
-        <ol className="courses">
-          {PLACES.map((p, i) => (
-            <li key={p.name}>
-              <button type="button" onMouseEnter={() => setHot(i)} onMouseLeave={() => setHot(null)} onFocus={() => setHot(i)} onBlur={() => setHot(null)}>
-                <span>{p.name}</span>
-                <span className="num">{p.min} мин {p.how}</span>
-              </button>
-            </li>
-          ))}
-        </ol>
-        <p className="muted">Время в пути — оценка по прямой и пешеходным дорожкам.</p>
-      </div>
-    </section>
   );
 }
 
