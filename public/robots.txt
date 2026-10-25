@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://georgy-itech.github.io/otliv-residence/sitemap.xml

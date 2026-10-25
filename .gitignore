@@ -1,0 +1,9 @@
+node_modules
+dist
+.impeccable/review
+.impeccable/live
+*.local
+.impeccable/questions
+.impeccable/hook.cache.json
+.impeccable/round1.json
+.impeccable/brief-body.md
