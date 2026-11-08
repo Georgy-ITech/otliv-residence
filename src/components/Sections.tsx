@@ -1,95 +1,73 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { APARTMENTS, FLOORS } from "../data/apartments";
-import { annuity, flats, mln, rub } from "../lib/format";
-import { Arrow } from "./Icons";
+import { useEffect, useRef, useState } from "react";
+import { annuity, mln, rub } from "../lib/format";
+import { ScrollTrigger, reducedMotion } from "../lib/motion";
 
-/* ---------- Квартиры по типам: таблица цен «от» ---------- */
-export function Types() {
-  const rows = useMemo(() => {
-    const groups = [
-      { k: 0, label: "Студии", q: "rooms=0" },
-      { k: 1, label: "Однокомнатные", q: "rooms=1" },
-      { k: 2, label: "Двухкомнатные", q: "rooms=2" },
-      { k: 3, label: "Трёхкомнатные", q: "rooms=3" },
-      { k: 4, label: "Пентхаусы", q: "rooms=4" },
-    ];
-    return groups.map((g) => {
-      const all = APARTMENTS.filter((a) => a.rooms === g.k);
-      const free = all.filter((a) => a.status === "free");
-      const areas = all.map((a) => a.area);
-      return { ...g, free: free.length, from: free.length ? Math.min(...free.map((a) => a.price)) : null, amin: Math.min(...areas), amax: Math.max(...areas) };
-    });
-  }, []);
-  const totalFree = APARTMENTS.filter((a) => a.status === "free").length;
-  return (
-    <section className="sec types" aria-labelledby="types-title">
-      <div className="sec__head">
-        <h2 id="types-title" className="h2">{flats(totalFree)} в продаже</h2>
-        <Link to="/kvartiry" className="btn btn--line">
-          Все квартиры и шахматка <Arrow />
-        </Link>
-      </div>
-      <table className="ledger">
-        <thead>
-          <tr>
-            <th scope="col">Тип</th>
-            <th scope="col" className="num">Площадь</th>
-            <th scope="col" className="num">Свободно</th>
-            <th scope="col" className="num">Цена от</th>
-            <th scope="col"><span className="sr-only">Перейти</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((r) => (
-            <tr key={r.k}>
-              <th scope="row">{r.label}</th>
-              <td className="num">{r.amin === r.amax ? `${r.amin}` : `${r.amin}–${r.amax}`} м²</td>
-              <td className="num">{r.free}</td>
-              <td className="num">{r.from ? mln(r.from) : "—"}</td>
-              <td>
-                <Link to={`/kvartiry?${r.q}`} className="ledger__go" aria-label={`Показать: ${r.label.toLowerCase()}`}>
-                  <Arrow />
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </section>
-  );
-}
-
-/* ---------- Ипотека и рассрочка ---------- */
+/* ---------- Ипотека и рассрочка: барабанные цифры и кривая долга-отлива ---------- */
 const HANDOVER = new Date(2028, 11, 1);
 function monthsToHandover() {
   const now = new Date();
   return Math.max(6, (HANDOVER.getFullYear() - now.getFullYear()) * 12 + HANDOVER.getMonth() - now.getMonth());
 }
 
+/** Число как барабан: каждая цифра — колонка 0–9, которая прокручивается к нужной. */
+export function Roll({ text, className = "" }: { text: string; className?: string }) {
+  return (
+    <span className={`roll ${className}`} role="img" aria-label={text}>
+      {[...text].map((ch, i) =>
+        /\d/.test(ch) ? (
+          <span key={`${text.length - i}`} className="roll__col" aria-hidden="true">
+            <span className="roll__strip" style={{ "--d": Number(ch) } as React.CSSProperties}>
+              {"0123456789".split("").map((d) => <span key={d}>{d}</span>)}
+            </span>
+          </span>
+        ) : (
+          <span key={`${text.length - i}`} className="roll__ch" aria-hidden="true">{ch}</span>
+        ),
+      )}
+    </span>
+  );
+}
+
 export function Mortgage({ initialPrice = 12_800_000, compact = false }: { initialPrice?: number; compact?: boolean }) {
+  const root = useRef<HTMLElement>(null);
   const [mode, setMode] = useState<"credit" | "plan">("credit");
   const [price, setPrice] = useState(initialPrice);
   const [down, setDown] = useState(20);
   const [years, setYears] = useState(20);
   const [rate, setRate] = useState(18);
+  const [drawn, setDrawn] = useState(false);
   const loan = price * (1 - down / 100);
   const pay = annuity(loan, rate, years);
   const months = monthsToHandover();
   const planDown = Math.max(30, down);
   const planPay = (price * (1 - planDown / 100)) / months;
+  const over = pay * years * 12 - loan;
+  const firstPay = (price * down) / 100;
+  const total = firstPay + pay * years * 12;
+  const share = (v: number) => `${((v / total) * 100).toFixed(1)}%`;
+
+  // График прорисовывается, когда секция входит в экран.
+  useEffect(() => {
+    if (!root.current || reducedMotion()) { setDrawn(true); return; }
+    const st = ScrollTrigger.create({ trigger: root.current, start: "top 70%", once: true, onEnter: () => setDrawn(true) });
+    return () => st.kill();
+  }, []);
+
+  const monthly = Math.round(mode === "credit" ? pay : planPay);
 
   return (
-    <section id={compact ? undefined : "ipoteka"} className={`sec calc ${compact ? "calc--compact" : ""}`} aria-labelledby="calc-title">
-      <div className="calc__head">
-        <h2 id="calc-title" className={compact ? "h3" : "h2"}>Ипотека или рассрочка</h2>
-        <div className="seg" role="tablist" aria-label="Способ оплаты">
+    <section ref={root} id={compact ? undefined : "ipoteka"} className={`mort ${compact ? "mort--compact" : ""} ${drawn ? "is-drawn" : ""}`} aria-labelledby="calc-title">
+      <div className="mort__head">
+        <h2 id="calc-title" className={compact ? "h3" : "mort__title"}>Сколько платить в месяц</h2>
+        <div className="mort__tabs" role="tablist" aria-label="Способ оплаты">
           <button role="tab" aria-selected={mode === "credit"} onClick={() => setMode("credit")} type="button">Ипотека</button>
-          <button role="tab" aria-selected={mode === "plan"} onClick={() => setMode("plan")} type="button">Рассрочка</button>
+          <button role="tab" aria-selected={mode === "plan"} onClick={() => setMode("plan")} type="button">Рассрочка до сдачи</button>
+          <span className="mort__tabline" style={{ "--x": mode === "credit" ? 0 : 1 } as React.CSSProperties} aria-hidden="true" />
         </div>
       </div>
-      <div className="calc__body">
-        <div className="calc__inputs">
+
+      <div className="mort__body">
+        <div className="mort__inputs">
           <Slider label="Стоимость квартиры" value={price} min={7_000_000} max={75_000_000} step={100_000} onChange={setPrice} format={(v) => mln(v)} />
           <Slider label="Первый взнос" value={mode === "plan" ? planDown : down} min={mode === "plan" ? 30 : 15} max={90} step={1} onChange={setDown} format={(v) => `${v} % · ${mln((price * v) / 100)}`} />
           {mode === "credit" ? (
@@ -99,25 +77,36 @@ export function Mortgage({ initialPrice = 12_800_000, compact = false }: { initi
             </>
           ) : null}
         </div>
-        <output className="calc__out" aria-live="polite">
-          <span className="calc__k">{mode === "credit" ? "Платёж в месяц" : `Платёж в месяц, ${months} мес. до сдачи`}</span>
-          <span className="calc__v num">{rub(mode === "credit" ? pay : planPay)}</span>
-          <dl className="calc__rows">
-            {mode === "credit" ? (
-              <>
-                <div><dt>Кредит</dt><dd className="num">{rub(loan)}</dd></div>
-                <div><dt>Переплата за срок</dt><dd className="num">{rub(pay * years * 12 - loan)}</dd></div>
-              </>
-            ) : (
-              <>
-                <div><dt>Взнос сейчас</dt><dd className="num">{rub((price * planDown) / 100)}</dd></div>
-                <div><dt>Без процентов</dt><dd>до IV квартала 2028</dd></div>
-              </>
-            )}
-          </dl>
-          <p className="calc__note">
-            {mode === "credit" ? "Укажите ставку своего банка — расчёт пересчитается. Это ориентир, не оферта." : "Условия рассрочки — для демонстрации расчёта."}
-          </p>
+
+        <output className="mort__out" aria-live="polite">
+          <span className="mort__k">{mode === "credit" ? "Платёж в месяц" : `В месяц, ${months} платежей до сдачи`}</span>
+          <span className="mort__v num"><Roll text={new Intl.NumberFormat("ru-RU").format(monthly)} /><small> ₽</small></span>
+
+          {mode === "credit" ? (
+            <div className="mort__split">
+              <p className="mort__split-h">Сколько вы отдадите за квартиру в итоге</p>
+              <div className="mort__bar" aria-hidden="true">
+                <span className="mort__seg mort__seg--down" style={{ "--w": share(firstPay) } as React.CSSProperties} />
+                <span className="mort__seg mort__seg--loan" style={{ "--w": share(loan) } as React.CSSProperties} />
+                <span className="mort__seg mort__seg--over" style={{ "--w": share(over) } as React.CSSProperties} />
+              </div>
+              <dl className="mort__rows">
+                <div><dt><i className="mort__sw mort__sw--down" />Первый взнос, сейчас</dt><dd className="num">{rub(firstPay)}</dd></div>
+                <div><dt><i className="mort__sw mort__sw--loan" />Кредит банка, вернёте за {years} лет</dt><dd className="num">{rub(loan)}</dd></div>
+                <div><dt><i className="mort__sw mort__sw--over" />Проценты банку сверху</dt><dd className="num">{rub(over)}</dd></div>
+                <div className="mort__total"><dt>Итого</dt><dd className="num">{rub(total)}</dd></div>
+              </dl>
+              <p className="mort__income">Банки обычно одобряют, если платёж не больше половины дохода: нужен доход от <b className="num">{rub(pay * 2)}</b> в месяц.</p>
+            </div>
+          ) : (
+            <div className="mort__plan">
+              <div className="mort__bars" aria-hidden="true">
+                {Array.from({ length: months }, (_, i) => <i key={i} style={{ "--i": i } as React.CSSProperties} />)}
+              </div>
+              <p>Взнос сейчас <b className="num">{rub((price * planDown) / 100)}</b>, остальное равными частями без процентов до IV квартала 2028.</p>
+            </div>
+          )}
+          <p className="mort__note">{mode === "credit" ? "Ориентир, не оферта: поставьте ставку своего банка." : "Условия рассрочки — для демонстрации расчёта."}</p>
         </output>
       </div>
     </section>
@@ -127,55 +116,14 @@ export function Mortgage({ initialPrice = 12_800_000, compact = false }: { initi
 function Slider({ label, value, min, max, step, onChange, format }: { label: string; value: number; min: number; max: number; step: number; onChange: (v: number) => void; format: (v: number) => string }) {
   const pct = ((value - min) / (max - min)) * 100;
   return (
-    <label className="slider">
-      <span className="slider__row">
+    <label className="wslider">
+      <span className="wslider__row">
         <span>{label}</span>
-        <span className="num slider__val">{format(value)}</span>
+        <span className="num wslider__val">{format(value)}</span>
       </span>
-      <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} style={{ "--p": `${pct}%` } as React.CSSProperties} />
+      <span className="wslider__track" style={{ "--pn": pct / 100 } as React.CSSProperties}>
+        <input type="range" min={min} max={max} step={step} value={value} onChange={(e) => onChange(Number(e.target.value))} />
+      </span>
     </label>
-  );
-}
-
-/* ---------- Ход строительства: вахтенный журнал и разрез с готовыми этажами ---------- */
-const LOG = [
-  { d: "18 марта 2026", t: "Шпунтовое ограждение и котлован", f: 0 },
-  { d: "29 мая 2026", t: "Фундаментная плита залита за трое суток", f: 0 },
-  { d: "14 июля 2026", t: "Стилобат, паркинг и лобби", f: 1 },
-  { d: "2 сентября 2026", t: "Монолит до шестого этажа", f: 6 },
-  { d: "16 октября 2026", t: "Девятый этаж, начат фасад к заливу", f: 9 },
-];
-export function Journal() {
-  const done = LOG[LOG.length - 1].f;
-  return (
-    <section id="stroyka" className="sec journal" aria-labelledby="journal-title">
-      <div className="journal__text">
-        <h2 id="journal-title" className="h2">Ход строительства</h2>
-        <table className="ledger ledger--log">
-          <thead>
-            <tr><th scope="col">Дата</th><th scope="col">Работы</th><th scope="col" className="num">Этаж</th></tr>
-          </thead>
-          <tbody>
-            {[...LOG].reverse().map((l) => (
-              <tr key={l.d}>
-                <td className="num">{l.d}</td>
-                <td>{l.t}</td>
-                <td className="num">{l.f || "—"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <svg className="elevation" viewBox="-80 0 300 520" role="img" aria-label={`Возведено ${done} этажей из ${FLOORS}`}>
-        {Array.from({ length: FLOORS }, (_, i) => {
-          const f = i + 1;
-          const y = 500 - f * 18;
-          return <rect key={f} x={f === FLOORS ? 46 : 30} y={y} width={f === FLOORS ? 128 : 160} height={16} className={f <= done ? "el--done" : "el--plan"} />;
-        })}
-        <line x1="0" y1="502" x2="220" y2="502" className="el--ground" />
-        <line x1="0" y1={500 - done * 18 - 1} x2="26" y2={500 - done * 18 - 1} className="el--tick" />
-        <text x="0" y={500 - done * 18 - 10} className="el--mark">{done} из {FLOORS}</text>
-      </svg>
-    </section>
   );
 }

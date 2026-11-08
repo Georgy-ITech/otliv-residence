@@ -7,3 +7,5 @@ dist
 .impeccable/hook.cache.json
 .impeccable/round1.json
 .impeccable/brief-body.md
+.shots
+.impeccable/stock
